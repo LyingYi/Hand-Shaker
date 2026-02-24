@@ -320,7 +320,12 @@ public class PluginProtocolHandler {
         }
 
         ClientInfo info = clients.get(player.getUniqueId());
-        if (info == null) return; // Player data not yet received
+        if (info == null) {
+            if (configManager.getBehavior() == ConfigManager.Behavior.STRICT) {
+                kickPlayer(player, configManager.getNoHandshakeKickMessage());
+            }
+            return;
+        }
 
         // Skip if already checked
         if (info.checked()) {

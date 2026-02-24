@@ -763,14 +763,12 @@ public class ConfigManager {
     }
     
     public void checkPlayer(net.minecraft.server.network.ServerPlayerEntity player, HandShakerServer.ClientInfo info, boolean executeActions) {
-        if (info == null) return;
-
         // Check for bypass permission - allows players to bypass all mod checks
         if (PermissionsAdapter.checkPermission(player, "handshaker.bypass")) {
             return;
         }
 
-        boolean hasMod = !info.mods().isEmpty();
+        boolean hasMod = info != null && !info.mods().isEmpty();
         
         // Integrity Check - if mode is SIGNED, enforce signature verification
         // This is checked FIRST because it's the most critical security check
@@ -800,6 +798,10 @@ public class ConfigManager {
         // If behavior is STRICT and client doesn't have the mod, kick
         if (behavior == Behavior.STRICT && !hasMod) {
             player.networkHandler.disconnect(net.minecraft.text.Text.literal(noHandshakeKickMessage));
+            return;
+        }
+
+        if (!hasMod) {
             return;
         }
 

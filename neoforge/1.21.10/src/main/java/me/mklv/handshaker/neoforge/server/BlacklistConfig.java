@@ -683,9 +683,7 @@ public class BlacklistConfig {
     }
 
     public void checkPlayer(net.minecraft.server.level.ServerPlayer player, HandShakerServerMod.ClientInfo info) {
-        if (info == null) return;
-
-        boolean hasMod = !info.mods().isEmpty();
+        boolean hasMod = info != null && !info.mods().isEmpty();
         
         // Integrity Check - if mode is SIGNED, enforce signature verification
         if (integrityMode == IntegrityMode.SIGNED) {
@@ -712,6 +710,10 @@ public class BlacklistConfig {
         // If behavior is STRICT and client doesn't have the mod, kick
         if (behavior == Behavior.STRICT && !hasMod) {
             player.connection.disconnect(net.minecraft.network.chat.Component.literal(noHandshakeKickMessage));
+            return;
+        }
+
+        if (!hasMod) {
             return;
         }
 
