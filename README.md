@@ -1,4 +1,4 @@
-# 🤝 HandShaker 6.0.0
+# 🤝 HandShaker 6.0.1
 
 >[!WARNING]
 > **This project requires setup on both client and server sides.**
