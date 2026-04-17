@@ -13,13 +13,18 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class HandShakerCommand {
     private final HandShakerPlugin plugin;
     
-    private static final List<String> ROOT_COMMANDS = Arrays.asList("reload", "info", "config", "mode", "manage");
+    private static final List<String> ROOT_COMMANDS = Arrays.asList("reload", "info", "config", "mode", "manage", "exportmods");
     private static final List<String> INFO_SUBCOMMANDS = Arrays.asList("configured_mods", "all_mods", "mod");
     private static final List<String> CONFIG_PARAMS = Arrays.asList("behavior", "integrity", "whitelist", "allow_bedrock", "playerdb_enabled");
     private static final List<String> MODE_LISTS = Arrays.asList("mods_required", "mods_blacklisted", "mods_whitelisted");
@@ -96,6 +101,7 @@ public class HandShakerCommand {
             case "info" -> handleInfo(sender, args);
             case "config" -> handleConfig(sender, args, config);
             case "mode" -> handleMode(sender, args, config);
+            case "exportmods" -> handleExportMods(sender, args);
             case "manage" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§cUsage: /handshaker manage <add | change | remove | ignore | player>");
@@ -114,6 +120,65 @@ public class HandShakerCommand {
             default -> sendUsage(sender);
         }
         return true;
+    }
+
+    private void handleExportMods(CommandSender sender, String[] args) {
+        List<Player> targets = new ArrayList<>();
+        if (args.length >= 2 && !args[1].equalsIgnoreCase("all")) {
+            Player target = Bukkit.getPlayerExact(args[1]);
+            if (target == null) {
+                sender.sendMessage("§cPlayer '" + args[1] + "' is not online.");
+                return;
+            }
+            targets.add(target);
+        } else {
+            targets.addAll(Bukkit.getOnlinePlayers());
+        }
+
+        if (targets.isEmpty()) {
+            sender.sendMessage("§eNo online players to export.");
+            return;
+        }
+
+        File exportDir = new File(plugin.getDataFolder(), "exports");
+        if (!exportDir.exists() && !exportDir.mkdirs()) {
+            sender.sendMessage("§cFailed to create export directory: " + exportDir.getAbsolutePath());
+            return;
+        }
+
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        String suffix = targets.size() == 1 ? "-" + targets.get(0).getName().toLowerCase(Locale.ROOT) : "-all-online";
+        File output = new File(exportDir, "mods-export-" + timestamp + suffix + ".yml");
+
+        try (FileWriter writer = new FileWriter(output)) {
+            writer.write("# HandShaker online players mod export\n");
+            writer.write("# Generated at: " + LocalDateTime.now() + "\n");
+            writer.write("# You can copy entries into mods-whitelisted.yml manually\n\n");
+
+            for (Player target : targets) {
+                Set<String> mods = plugin.getClientMods(target.getUniqueId());
+                List<String> modList = mods == null ? Collections.emptyList() : mods.stream()
+                    .map(mod -> mod.toLowerCase(Locale.ROOT))
+                    .sorted()
+                    .toList();
+
+                writer.write(target.getName() + ":\n");
+                writer.write("  mods:\n");
+                if (modList.isEmpty()) {
+                    writer.write("    # no mod data received yet\n");
+                } else {
+                    for (String mod : modList) {
+                        writer.write("    - " + mod + "\n");
+                    }
+                }
+                writer.write("\n");
+            }
+        } catch (IOException e) {
+            sender.sendMessage("§cFailed to export mod list: " + e.getMessage());
+            return;
+        }
+
+        sender.sendMessage("§aExported " + targets.size() + " player(s) mod list to: §f" + output.getAbsolutePath());
     }
 
     private void handleRemove(CommandSender sender, String[] args, ConfigManager config) {
@@ -671,6 +736,7 @@ public class HandShakerCommand {
         sender.sendMessage("§e/handshaker info [configured_mods|all_mods [page]|mod <modname>] §7 | §7Show statistics or list mods");
         sender.sendMessage("§e/handshaker config [param] [value] §7 | §7View/change configuration");
         sender.sendMessage("§e/handshaker mode <mods_required|mods_blacklisted|mods_whitelisted> <on|off> §7 | §7Toggle mod lists");
+        sender.sendMessage("§e/handshaker exportmods [player|all] §7 | §7Export online player mod lists to local file");
         sender.sendMessage("");
         sender.sendMessage("§e§lMod Management (/handshaker manage):");
         sender.sendMessage("§e/handshaker manage add <mod | *> <status> [action] [warn-message] §7 | §7Add/set mod status");
@@ -717,6 +783,12 @@ public class HandShakerCommand {
                 case "config" -> { return StringUtil.copyPartialMatches(args[1], CONFIG_PARAMS, new ArrayList<>()); }
                 case "mode" -> { return StringUtil.copyPartialMatches(args[1], MODE_LISTS, new ArrayList<>()); }
                 case "manage" -> { return StringUtil.copyPartialMatches(args[1], MANAGE_SUBCOMMANDS, new ArrayList<>()); }
+                case "exportmods" -> {
+                    List<String> suggestions = new ArrayList<>();
+                    suggestions.add("all");
+                    suggestions.addAll(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+                    return StringUtil.copyPartialMatches(args[1], suggestions, new ArrayList<>());
+                }
             }
         }
 
