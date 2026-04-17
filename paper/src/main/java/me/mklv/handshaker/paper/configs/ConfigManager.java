@@ -95,12 +95,14 @@ public class ConfigManager {
     private String invalidSignatureKickMessage = "Invalid client signature. Please use the official HandShaker client mod.";
     private boolean allowBedrockPlayers = false;
     private boolean playerdbEnabled = false;
+    private boolean debugEnabled = false;
     
     private final Map<String, String> customMessages = new LinkedHashMap<>();
     
     private boolean modsRequiredEnabled = true;
     private boolean modsBlacklistedEnabled = true;
     private boolean modsWhitelistedEnabled = true;
+    private boolean strictWhitelistMatch = false;
     
     private final Map<String, ModConfig> modConfigMap = new LinkedHashMap<>();
     private boolean whitelist = false;
@@ -187,6 +189,10 @@ public class ConfigManager {
                 if (data.containsKey("playerdb-enabled")) {
                     playerdbEnabled = Boolean.parseBoolean(data.get("playerdb-enabled").toString());
                 }
+                if (data.containsKey("debug")) {
+                    debugEnabled = Boolean.parseBoolean(data.get("debug").toString());
+                }
+                HandShakerPlugin.DEBUG = debugEnabled;
 
                 if (data.containsKey("mods-required-enabled")) {
                     modsRequiredEnabled = Boolean.parseBoolean(data.get("mods-required-enabled").toString());
@@ -196,6 +202,14 @@ public class ConfigManager {
                 }
                 if (data.containsKey("mods-whitelisted-enabled")) {
                     modsWhitelistedEnabled = Boolean.parseBoolean(data.get("mods-whitelisted-enabled").toString());
+                }
+                if (data.containsKey("strict-whitelist-match")) {
+                    strictWhitelistMatch = Boolean.parseBoolean(data.get("strict-whitelist-match").toString());
+                }
+                if (HandShakerPlugin.DEBUG) {
+                    plugin.getLogger().info("[DEBUG] Loaded whitelist settings: whitelist=" + whitelist
+                        + ", mods-whitelisted-enabled=" + modsWhitelistedEnabled
+                        + ", strict-whitelist-match=" + strictWhitelistMatch);
                 }
 
                 if (data.containsKey("messages")) {
@@ -310,7 +324,8 @@ public class ConfigManager {
         }
 
         File whitelistedFile = new File(dataFolder, "mods-whitelisted.yml");
-        if (modsWhitelistedEnabled && whitelistedFile.exists()) {
+        boolean whitelistListNeeded = modsWhitelistedEnabled || whitelist || strictWhitelistMatch;
+        if (whitelistListNeeded && whitelistedFile.exists()) {
             try (FileReader reader = new FileReader(whitelistedFile)) {
                 Map<String, Object> data = yaml.load(reader);
                 if (data != null && data.containsKey("whitelisted")) {
@@ -324,8 +339,16 @@ public class ConfigManager {
                             whitelistedModsActive.add(modId);
                             modConfigMap.put(modId, new ModConfig("allowed", action, null));
                         }
+                    } else if (whitelistedObj instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<String> whitelistedList = (List<String>) whitelistedObj;
+                        for (String mod : whitelistedList) {
+                            String modId = mod.toLowerCase(Locale.ROOT);
+                            whitelistedModsActive.add(modId);
+                            modConfigMap.put(modId, new ModConfig("allowed", "none", null));
+                        }
                     } else {
-                        plugin.getLogger().warning("Invalid structure in mods-whitelisted.yml: 'whitelisted' must be a map (modname: action), not a list");
+                        plugin.getLogger().warning("Invalid structure in mods-whitelisted.yml: 'whitelisted' must be a map (modname: action) or list");
                     }
                 }
             } catch (IOException e) {
@@ -333,7 +356,7 @@ public class ConfigManager {
             }
         }
         
-        if (modsWhitelistedEnabled && !whitelistedFile.exists()) {
+        if (whitelistListNeeded && !whitelistedFile.exists()) {
             try (FileWriter writer = new FileWriter(whitelistedFile)) {
                 writer.write("# Whitelisted mods which are allowed but not required,\n");
                 writer.write("# but if in config.yml whitelist: true, only these mods are allowed\n");
@@ -422,6 +445,7 @@ public class ConfigManager {
     public boolean areModsBlacklistedEnabled() { return modsBlacklistedEnabled; }
     public boolean areModsWhitelistedEnabled() { return modsWhitelistedEnabled; }
     public boolean isPlayerdbEnabled() { return playerdbEnabled; }
+    public boolean isDebugEnabled() { return debugEnabled; }
     public ActionDefinition getAction(String actionName) { 
         if (actionName == null) return null;
         return actionsMap.get(actionName.toLowerCase(Locale.ROOT));
@@ -481,6 +505,11 @@ public class ConfigManager {
     public void setPlayerdbEnabled(boolean enabled) {
         this.playerdbEnabled = enabled;
         save();
+    }
+
+    public void setDebugEnabled(boolean enabled) {
+        this.debugEnabled = enabled;
+        HandShakerPlugin.DEBUG = enabled;
     }
 
     public boolean addIgnoredMod(String modId) {
@@ -670,15 +699,44 @@ public class ConfigManager {
             return new PlayerModStatus(missingWhitelistModMessage.replace("{mod}", modList), actionName, missingRequired, true, false);
         }
 
-        if (whitelist) {
-            Set<String> nonWhitelistedMods = new HashSet<>();
+        boolean whitelistEnforced = whitelist || strictWhitelistMatch;
+        if (whitelistEnforced) {
+            Set<String> normalizedClientMods = new HashSet<>();
             for (String modId : clientMods) {
                 String modIdLower = modId.toLowerCase(Locale.ROOT);
-                if (!ignoredMods.contains(modIdLower) && !whitelistedModsActive.contains(modIdLower)) {
-                    nonWhitelistedMods.add(modIdLower);
+                if (!ignoredMods.contains(modIdLower)) {
+                    normalizedClientMods.add(modIdLower);
                 }
             }
+            if (HandShakerPlugin.DEBUG) {
+                plugin.getLogger().info("[DEBUG] Whitelist check for " + player.getName()
+                    + ": strict=" + strictWhitelistMatch
+                    + ", whitelistEnabled=" + whitelist
+                    + ", modsWhitelistedEnabled=" + modsWhitelistedEnabled
+                    + ", whitelistEnforced=" + whitelistEnforced
+                    + ", whitelistedModsActive=" + whitelistedModsActive
+                    + ", ignoredMods=" + ignoredMods
+                    + ", normalizedClientMods=" + normalizedClientMods);
+            }
+
+            if (strictWhitelistMatch) {
+                Set<String> missingWhitelisted = new HashSet<>(whitelistedModsActive);
+                missingWhitelisted.removeAll(normalizedClientMods);
+                if (!missingWhitelisted.isEmpty()) {
+                    if (HandShakerPlugin.DEBUG) {
+                        plugin.getLogger().info("[DEBUG] Strict whitelist failed (missing mods): " + missingWhitelisted);
+                    }
+                    String modList = String.join(", ", missingWhitelisted);
+                    return new PlayerModStatus(missingWhitelistModMessage.replace("{mod}", modList), "kick", missingWhitelisted, true, false);
+                }
+            }
+
+            Set<String> nonWhitelistedMods = new HashSet<>(normalizedClientMods);
+            nonWhitelistedMods.removeAll(whitelistedModsActive);
             if (!nonWhitelistedMods.isEmpty()) {
+                if (HandShakerPlugin.DEBUG) {
+                    plugin.getLogger().info("[DEBUG] Whitelist failed (extra mods): " + nonWhitelistedMods);
+                }
                 String modList = String.join(", ", nonWhitelistedMods);
                 ModConfig cfg = modConfigMap.get(nonWhitelistedMods.iterator().next().toLowerCase(Locale.ROOT));
                 String actionName = cfg != null ? cfg.getActionName() : "kick";
@@ -751,9 +809,11 @@ public class ConfigManager {
             .replaceAll("whitelist:\\s*(?:true|false)", "whitelist: " + whitelist)
             .replaceAll("allow-bedrock-players:\\s*(?:true|false)", "allow-bedrock-players: " + allowBedrockPlayers)
             .replaceAll("playerdb-enabled:\\s*(?:true|false)", "playerdb-enabled: " + playerdbEnabled)
+            .replaceAll("debug:\\s*(?:true|false)", "debug: " + debugEnabled)
             .replaceAll("mods-required-enabled:\\s*(?:true|false)", "mods-required-enabled: " + modsRequiredEnabled)
             .replaceAll("mods-blacklisted-enabled:\\s*(?:true|false)", "mods-blacklisted-enabled: " + modsBlacklistedEnabled)
-            .replaceAll("mods-whitelisted-enabled:\\s*(?:true|false)", "mods-whitelisted-enabled: " + modsWhitelistedEnabled);
+            .replaceAll("mods-whitelisted-enabled:\\s*(?:true|false)", "mods-whitelisted-enabled: " + modsWhitelistedEnabled)
+            .replaceAll("strict-whitelist-match:\\s*(?:true|false)", "strict-whitelist-match: " + strictWhitelistMatch);
         
         try (FileWriter writer = new FileWriter(configYmlFile)) {
             writer.write(yaml);
