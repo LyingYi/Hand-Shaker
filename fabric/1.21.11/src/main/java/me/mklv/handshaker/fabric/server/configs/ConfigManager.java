@@ -181,6 +181,10 @@ public class ConfigManager {
                 if (data.containsKey("strict-whitelist-match")) {
                     strictWhitelistMatch = Boolean.parseBoolean(data.get("strict-whitelist-match").toString());
                 }
+                if (HandShakerServer.DEBUG_MODE) {
+                    HandShakerServer.LOGGER.info("[DEBUG] Loaded whitelist settings: whitelist={}, mods-whitelisted-enabled={}, strict-whitelist-match={}",
+                        whitelist, modsWhitelistedEnabled, strictWhitelistMatch);
+                }
 
                 // Load messages
                 if (data.containsKey("messages")) {
@@ -927,11 +931,18 @@ public class ConfigManager {
                     normalizedClientMods.add(modLower);
                 }
             }
+            if (HandShakerServer.DEBUG_MODE) {
+                HandShakerServer.LOGGER.info("[DEBUG] Whitelist check for {}: strict={}, whitelistedModsActive={}, ignoredMods={}, normalizedClientMods={}",
+                    player.getName().getString(), strictWhitelistMatch, whitelistedModsActive, ignoredMods, normalizedClientMods);
+            }
 
             if (strictWhitelistMatch) {
                 Set<String> missingWhitelisted = new HashSet<>(whitelistedModsActive);
                 missingWhitelisted.removeAll(normalizedClientMods);
                 if (!missingWhitelisted.isEmpty()) {
+                    if (HandShakerServer.DEBUG_MODE) {
+                        HandShakerServer.LOGGER.info("[DEBUG] Strict whitelist failed (missing mods): {}", missingWhitelisted);
+                    }
                     String msg = missingWhitelistModMessage.replace("{mod}", String.join(", ", missingWhitelisted));
                     player.networkHandler.disconnect(net.minecraft.text.Text.literal(msg));
                     return;
@@ -941,6 +952,9 @@ public class ConfigManager {
             Set<String> nonWhitelistedMods = new HashSet<>(normalizedClientMods);
             nonWhitelistedMods.removeAll(whitelistedModsActive);
             if (!nonWhitelistedMods.isEmpty()) {
+                if (HandShakerServer.DEBUG_MODE) {
+                    HandShakerServer.LOGGER.info("[DEBUG] Whitelist failed (extra mods): {}", nonWhitelistedMods);
+                }
                 String msg = kickMessage.replace("{mod}", String.join(", ", nonWhitelistedMods));
                 player.networkHandler.disconnect(net.minecraft.text.Text.literal(msg));
                 return;

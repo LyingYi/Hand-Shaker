@@ -201,6 +201,11 @@ public class ConfigManager {
                 if (data.containsKey("strict-whitelist-match")) {
                     strictWhitelistMatch = Boolean.parseBoolean(data.get("strict-whitelist-match").toString());
                 }
+                if (HandShakerPlugin.DEBUG) {
+                    plugin.getLogger().info("[DEBUG] Loaded whitelist settings: whitelist=" + whitelist
+                        + ", mods-whitelisted-enabled=" + modsWhitelistedEnabled
+                        + ", strict-whitelist-match=" + strictWhitelistMatch);
+                }
 
                 if (data.containsKey("messages")) {
                     @SuppressWarnings("unchecked")
@@ -682,11 +687,22 @@ public class ConfigManager {
                     normalizedClientMods.add(modIdLower);
                 }
             }
+            if (HandShakerPlugin.DEBUG) {
+                plugin.getLogger().info("[DEBUG] Whitelist check for " + player.getName()
+                    + ": strict=" + strictWhitelistMatch
+                    + ", whitelistEnabled=" + whitelist
+                    + ", whitelistedModsActive=" + whitelistedModsActive
+                    + ", ignoredMods=" + ignoredMods
+                    + ", normalizedClientMods=" + normalizedClientMods);
+            }
 
             if (strictWhitelistMatch) {
                 Set<String> missingWhitelisted = new HashSet<>(whitelistedModsActive);
                 missingWhitelisted.removeAll(normalizedClientMods);
                 if (!missingWhitelisted.isEmpty()) {
+                    if (HandShakerPlugin.DEBUG) {
+                        plugin.getLogger().info("[DEBUG] Strict whitelist failed (missing mods): " + missingWhitelisted);
+                    }
                     String modList = String.join(", ", missingWhitelisted);
                     return new PlayerModStatus(missingWhitelistModMessage.replace("{mod}", modList), "kick", missingWhitelisted, true, false);
                 }
@@ -695,6 +711,9 @@ public class ConfigManager {
             Set<String> nonWhitelistedMods = new HashSet<>(normalizedClientMods);
             nonWhitelistedMods.removeAll(whitelistedModsActive);
             if (!nonWhitelistedMods.isEmpty()) {
+                if (HandShakerPlugin.DEBUG) {
+                    plugin.getLogger().info("[DEBUG] Whitelist failed (extra mods): " + nonWhitelistedMods);
+                }
                 String modList = String.join(", ", nonWhitelistedMods);
                 ModConfig cfg = modConfigMap.get(nonWhitelistedMods.iterator().next().toLowerCase(Locale.ROOT));
                 String actionName = cfg != null ? cfg.getActionName() : "kick";
