@@ -679,7 +679,8 @@ public class ConfigManager {
             return new PlayerModStatus(missingWhitelistModMessage.replace("{mod}", modList), actionName, missingRequired, true, false);
         }
 
-        if (whitelist) {
+        boolean whitelistEnforced = whitelist || strictWhitelistMatch;
+        if (whitelistEnforced) {
             Set<String> normalizedClientMods = new HashSet<>();
             for (String modId : clientMods) {
                 String modIdLower = modId.toLowerCase(Locale.ROOT);
@@ -691,6 +692,7 @@ public class ConfigManager {
                 plugin.getLogger().info("[DEBUG] Whitelist check for " + player.getName()
                     + ": strict=" + strictWhitelistMatch
                     + ", whitelistEnabled=" + whitelist
+                    + ", whitelistEnforced=" + whitelistEnforced
                     + ", whitelistedModsActive=" + whitelistedModsActive
                     + ", ignoredMods=" + ignoredMods
                     + ", normalizedClientMods=" + normalizedClientMods);
