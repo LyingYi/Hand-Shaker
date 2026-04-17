@@ -319,7 +319,8 @@ public class ConfigManager {
         }
 
         File whitelistedFile = new File(dataFolder, "mods-whitelisted.yml");
-        if (modsWhitelistedEnabled && whitelistedFile.exists()) {
+        boolean whitelistListNeeded = modsWhitelistedEnabled || whitelist || strictWhitelistMatch;
+        if (whitelistListNeeded && whitelistedFile.exists()) {
             try (FileReader reader = new FileReader(whitelistedFile)) {
                 Map<String, Object> data = yaml.load(reader);
                 if (data != null && data.containsKey("whitelisted")) {
@@ -333,8 +334,16 @@ public class ConfigManager {
                             whitelistedModsActive.add(modId);
                             modConfigMap.put(modId, new ModConfig("allowed", action, null));
                         }
+                    } else if (whitelistedObj instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<String> whitelistedList = (List<String>) whitelistedObj;
+                        for (String mod : whitelistedList) {
+                            String modId = mod.toLowerCase(Locale.ROOT);
+                            whitelistedModsActive.add(modId);
+                            modConfigMap.put(modId, new ModConfig("allowed", "none", null));
+                        }
                     } else {
-                        plugin.getLogger().warning("Invalid structure in mods-whitelisted.yml: 'whitelisted' must be a map (modname: action), not a list");
+                        plugin.getLogger().warning("Invalid structure in mods-whitelisted.yml: 'whitelisted' must be a map (modname: action) or list");
                     }
                 }
             } catch (IOException e) {
@@ -342,7 +351,7 @@ public class ConfigManager {
             }
         }
         
-        if (modsWhitelistedEnabled && !whitelistedFile.exists()) {
+        if (whitelistListNeeded && !whitelistedFile.exists()) {
             try (FileWriter writer = new FileWriter(whitelistedFile)) {
                 writer.write("# Whitelisted mods which are allowed but not required,\n");
                 writer.write("# but if in config.yml whitelist: true, only these mods are allowed\n");
@@ -692,6 +701,7 @@ public class ConfigManager {
                 plugin.getLogger().info("[DEBUG] Whitelist check for " + player.getName()
                     + ": strict=" + strictWhitelistMatch
                     + ", whitelistEnabled=" + whitelist
+                    + ", modsWhitelistedEnabled=" + modsWhitelistedEnabled
                     + ", whitelistEnforced=" + whitelistEnforced
                     + ", whitelistedModsActive=" + whitelistedModsActive
                     + ", ignoredMods=" + ignoredMods
