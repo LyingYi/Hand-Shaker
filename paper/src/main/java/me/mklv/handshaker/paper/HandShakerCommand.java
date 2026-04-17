@@ -26,7 +26,7 @@ public class HandShakerCommand {
     
     private static final List<String> ROOT_COMMANDS = Arrays.asList("reload", "info", "config", "mode", "manage", "exportmods");
     private static final List<String> INFO_SUBCOMMANDS = Arrays.asList("configured_mods", "all_mods", "mod");
-    private static final List<String> CONFIG_PARAMS = Arrays.asList("behavior", "integrity", "whitelist", "allow_bedrock", "playerdb_enabled");
+    private static final List<String> CONFIG_PARAMS = Arrays.asList("behavior", "integrity", "whitelist", "allow_bedrock", "playerdb_enabled", "debug");
     private static final List<String> MODE_LISTS = Arrays.asList("mods_required", "mods_blacklisted", "mods_whitelisted");
     private static final List<String> MANAGE_SUBCOMMANDS = Arrays.asList("add", "change", "remove", "ignore", "player");
     private static final List<String> MOD_MODES = Arrays.asList("allowed", "required", "blacklisted");
@@ -201,6 +201,7 @@ public class HandShakerCommand {
                 player.sendMessage(Component.text("  Integrity Mode: ").color(NamedTextColor.YELLOW).append(Component.text(config.getIntegrityMode().toString()).color(NamedTextColor.WHITE)));
                 player.sendMessage(Component.text("  Whitelist Mode: ").color(NamedTextColor.YELLOW).append(Component.text(config.isWhitelist() ? "ON" : "OFF").color(NamedTextColor.WHITE)));
                 player.sendMessage(Component.text("  Bedrock Players: ").color(NamedTextColor.YELLOW).append(Component.text(config.isAllowBedrockPlayers() ? "Allowed" : "Blocked").color(NamedTextColor.WHITE)));
+                player.sendMessage(Component.text("  Debug Mode: ").color(NamedTextColor.YELLOW).append(Component.text(config.isDebugEnabled() ? "ON" : "OFF").color(NamedTextColor.WHITE)));
                 player.sendMessage(Component.empty());
                 player.sendMessage(Component.text("  Kick Messages:").color(NamedTextColor.GRAY).decorate(TextDecoration.ITALIC));
                 player.sendMessage(Component.text("    Kick: ").color(NamedTextColor.GRAY).append(Component.text(config.getKickMessage()).color(NamedTextColor.DARK_GRAY)));
@@ -215,6 +216,7 @@ public class HandShakerCommand {
                 sender.sendMessage("§eIntegrity Mode: §f" + config.getIntegrityMode());
                 sender.sendMessage("§eWhitelist Mode: §f" + (config.isWhitelist() ? "ON" : "OFF"));
                 sender.sendMessage("§eAllow Bedrock Players: §f" + (config.isAllowBedrockPlayers() ? "Yes" : "No"));
+                sender.sendMessage("§eDebug Mode: §f" + (config.isDebugEnabled() ? "ON" : "OFF"));
                 sender.sendMessage("");
                 sender.sendMessage("§6Usage: §e/handshaker config <param> <value>");
             }
@@ -272,6 +274,11 @@ public class HandShakerCommand {
                 boolean enabled = value.equalsIgnoreCase("true");
                 config.setPlayerdbEnabled(enabled);
                 sender.sendMessage("§aSet playerdb_enabled to " + (enabled ? "enabled" : "disabled"));
+            }
+            case "debug" -> {
+                boolean enabled = value.equalsIgnoreCase("true");
+                config.setDebugEnabled(enabled);
+                sender.sendMessage("§aSet debug mode to " + (enabled ? "enabled" : "disabled"));
             }
             case "kick-message" -> {
                 config.setKickMessage(value);
@@ -806,7 +813,7 @@ public class HandShakerCommand {
                 switch (param) {
                     case "behavior" -> { return StringUtil.copyPartialMatches(args[2], BEHAVIOR_MODES, new ArrayList<>()); }
                     case "integrity" -> { return StringUtil.copyPartialMatches(args[2], INTEGRITY_MODES, new ArrayList<>()); }
-                    case "whitelist", "allow_bedrock", "playerdb_enabled" -> { return StringUtil.copyPartialMatches(args[2], BOOLEAN_VALUES, new ArrayList<>()); }
+                    case "whitelist", "allow_bedrock", "playerdb_enabled", "debug" -> { return StringUtil.copyPartialMatches(args[2], BOOLEAN_VALUES, new ArrayList<>()); }
                 }
             }
         }

@@ -95,6 +95,7 @@ public class ConfigManager {
     private String invalidSignatureKickMessage = "Invalid client signature. Please use the official HandShaker client mod.";
     private boolean allowBedrockPlayers = false;
     private boolean playerdbEnabled = false;
+    private boolean debugEnabled = false;
     
     private final Map<String, String> customMessages = new LinkedHashMap<>();
     
@@ -188,6 +189,10 @@ public class ConfigManager {
                 if (data.containsKey("playerdb-enabled")) {
                     playerdbEnabled = Boolean.parseBoolean(data.get("playerdb-enabled").toString());
                 }
+                if (data.containsKey("debug")) {
+                    debugEnabled = Boolean.parseBoolean(data.get("debug").toString());
+                }
+                HandShakerPlugin.DEBUG = debugEnabled;
 
                 if (data.containsKey("mods-required-enabled")) {
                     modsRequiredEnabled = Boolean.parseBoolean(data.get("mods-required-enabled").toString());
@@ -440,6 +445,7 @@ public class ConfigManager {
     public boolean areModsBlacklistedEnabled() { return modsBlacklistedEnabled; }
     public boolean areModsWhitelistedEnabled() { return modsWhitelistedEnabled; }
     public boolean isPlayerdbEnabled() { return playerdbEnabled; }
+    public boolean isDebugEnabled() { return debugEnabled; }
     public ActionDefinition getAction(String actionName) { 
         if (actionName == null) return null;
         return actionsMap.get(actionName.toLowerCase(Locale.ROOT));
@@ -499,6 +505,11 @@ public class ConfigManager {
     public void setPlayerdbEnabled(boolean enabled) {
         this.playerdbEnabled = enabled;
         save();
+    }
+
+    public void setDebugEnabled(boolean enabled) {
+        this.debugEnabled = enabled;
+        HandShakerPlugin.DEBUG = enabled;
     }
 
     public boolean addIgnoredMod(String modId) {
@@ -798,6 +809,7 @@ public class ConfigManager {
             .replaceAll("whitelist:\\s*(?:true|false)", "whitelist: " + whitelist)
             .replaceAll("allow-bedrock-players:\\s*(?:true|false)", "allow-bedrock-players: " + allowBedrockPlayers)
             .replaceAll("playerdb-enabled:\\s*(?:true|false)", "playerdb-enabled: " + playerdbEnabled)
+            .replaceAll("debug:\\s*(?:true|false)", "debug: " + debugEnabled)
             .replaceAll("mods-required-enabled:\\s*(?:true|false)", "mods-required-enabled: " + modsRequiredEnabled)
             .replaceAll("mods-blacklisted-enabled:\\s*(?:true|false)", "mods-blacklisted-enabled: " + modsBlacklistedEnabled)
             .replaceAll("mods-whitelisted-enabled:\\s*(?:true|false)", "mods-whitelisted-enabled: " + modsWhitelistedEnabled)

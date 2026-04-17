@@ -15,6 +15,9 @@ allow-bedrock-players: false
 # Player Database: Store and track player mod history (requires playerdb to be enabled)
 playerdb-enabled: false
 
+# Debug mode: enables verbose [DEBUG] logs
+debug: false
+
 # Mod List Toggles: Enable/disable each mod list without losing configuration
 mods-required-enabled: true
 mods-blacklisted-enabled: true
