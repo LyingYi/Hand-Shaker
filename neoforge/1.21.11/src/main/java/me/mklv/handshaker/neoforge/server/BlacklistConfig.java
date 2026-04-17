@@ -64,6 +64,7 @@ public class BlacklistConfig {
     private boolean modsRequiredEnabled = true;
     private boolean modsBlacklistedEnabled = true;
     private boolean modsWhitelistedEnabled = false;
+    private boolean strictWhitelistMatch = false;
     
     private final Map<String, ModConfig> modConfigMap = new LinkedHashMap<>();
     private boolean whitelist = false;
@@ -169,6 +170,9 @@ public class BlacklistConfig {
                 }
                 if (data.containsKey("mods-whitelisted-enabled")) {
                     modsWhitelistedEnabled = Boolean.parseBoolean(data.get("mods-whitelisted-enabled").toString());
+                }
+                if (data.containsKey("strict-whitelist-match")) {
+                    strictWhitelistMatch = Boolean.parseBoolean(data.get("strict-whitelist-match").toString());
                 }
 
                 // Load messages
@@ -595,7 +599,8 @@ public class BlacklistConfig {
             yaml.append("playerdb-enabled: ").append(playerdbEnabled).append("\n\n");
             yaml.append("mods-required-enabled: ").append(modsRequiredEnabled).append("\n");
             yaml.append("mods-blacklisted-enabled: ").append(modsBlacklistedEnabled).append("\n");
-            yaml.append("mods-whitelisted-enabled: ").append(modsWhitelistedEnabled).append("\n\n");
+            yaml.append("mods-whitelisted-enabled: ").append(modsWhitelistedEnabled).append("\n");
+            yaml.append("strict-whitelist-match: ").append(strictWhitelistMatch).append("\n\n");
             yaml.append("messages:\n");
             yaml.append("  kick: \"").append(escapeYamlString(kickMessage)).append("\"\n");
             yaml.append("  no-handshake: \"").append(escapeYamlString(noHandshakeKickMessage)).append("\"\n");
@@ -747,6 +752,42 @@ public class BlacklistConfig {
         if (!blacklistedFound.isEmpty()) {
             String msg = kickMessage.replace("{mod}", String.join(", ", blacklistedFound));
             player.connection.disconnect(net.minecraft.network.chat.Component.literal(msg));
+            return;
+        }
+
+        if (whitelist && modsWhitelistedEnabled) {
+            Set<String> normalizedClientMods = new HashSet<>();
+            for (String modId : info.mods()) {
+                String modLower = modId.toLowerCase(Locale.ROOT);
+                if (!ignoredMods.contains(modLower)) {
+                    normalizedClientMods.add(modLower);
+                }
+            }
+
+            if (strictWhitelistMatch) {
+                Set<String> missingWhitelisted = new HashSet<>(whitelistedModsActive);
+                missingWhitelisted.removeAll(normalizedClientMods);
+                if (!missingWhitelisted.isEmpty()) {
+                    String msg = missingWhitelistModMessage.replace("{mod}", String.join(", ", missingWhitelisted));
+                    player.connection.disconnect(net.minecraft.network.chat.Component.literal(msg));
+                    return;
+                }
+
+                Set<String> nonWhitelistedMods = new HashSet<>(normalizedClientMods);
+                nonWhitelistedMods.removeAll(whitelistedModsActive);
+                if (!nonWhitelistedMods.isEmpty()) {
+                    String msg = kickMessage.replace("{mod}", String.join(", ", nonWhitelistedMods));
+                    player.connection.disconnect(net.minecraft.network.chat.Component.literal(msg));
+                    return;
+                }
+            } else {
+                Set<String> nonWhitelistedMods = new HashSet<>(normalizedClientMods);
+                nonWhitelistedMods.removeAll(whitelistedModsActive);
+                if (!nonWhitelistedMods.isEmpty()) {
+                    String msg = kickMessage.replace("{mod}", String.join(", ", nonWhitelistedMods));
+                    player.connection.disconnect(net.minecraft.network.chat.Component.literal(msg));
+                }
+            }
         }
     }
 
