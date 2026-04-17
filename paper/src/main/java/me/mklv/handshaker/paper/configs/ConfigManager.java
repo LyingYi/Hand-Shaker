@@ -101,6 +101,7 @@ public class ConfigManager {
     private boolean modsRequiredEnabled = true;
     private boolean modsBlacklistedEnabled = true;
     private boolean modsWhitelistedEnabled = true;
+    private boolean strictWhitelistMatch = false;
     
     private final Map<String, ModConfig> modConfigMap = new LinkedHashMap<>();
     private boolean whitelist = false;
@@ -196,6 +197,14 @@ public class ConfigManager {
                 }
                 if (data.containsKey("mods-whitelisted-enabled")) {
                     modsWhitelistedEnabled = Boolean.parseBoolean(data.get("mods-whitelisted-enabled").toString());
+                }
+                if (data.containsKey("strict-whitelist-match")) {
+                    strictWhitelistMatch = Boolean.parseBoolean(data.get("strict-whitelist-match").toString());
+                }
+                if (HandShakerPlugin.DEBUG) {
+                    plugin.getLogger().info("[DEBUG] Loaded whitelist settings: whitelist=" + whitelist
+                        + ", mods-whitelisted-enabled=" + modsWhitelistedEnabled
+                        + ", strict-whitelist-match=" + strictWhitelistMatch);
                 }
 
                 if (data.containsKey("messages")) {
@@ -671,14 +680,40 @@ public class ConfigManager {
         }
 
         if (whitelist) {
-            Set<String> nonWhitelistedMods = new HashSet<>();
+            Set<String> normalizedClientMods = new HashSet<>();
             for (String modId : clientMods) {
                 String modIdLower = modId.toLowerCase(Locale.ROOT);
-                if (!ignoredMods.contains(modIdLower) && !whitelistedModsActive.contains(modIdLower)) {
-                    nonWhitelistedMods.add(modIdLower);
+                if (!ignoredMods.contains(modIdLower)) {
+                    normalizedClientMods.add(modIdLower);
                 }
             }
+            if (HandShakerPlugin.DEBUG) {
+                plugin.getLogger().info("[DEBUG] Whitelist check for " + player.getName()
+                    + ": strict=" + strictWhitelistMatch
+                    + ", whitelistEnabled=" + whitelist
+                    + ", whitelistedModsActive=" + whitelistedModsActive
+                    + ", ignoredMods=" + ignoredMods
+                    + ", normalizedClientMods=" + normalizedClientMods);
+            }
+
+            if (strictWhitelistMatch) {
+                Set<String> missingWhitelisted = new HashSet<>(whitelistedModsActive);
+                missingWhitelisted.removeAll(normalizedClientMods);
+                if (!missingWhitelisted.isEmpty()) {
+                    if (HandShakerPlugin.DEBUG) {
+                        plugin.getLogger().info("[DEBUG] Strict whitelist failed (missing mods): " + missingWhitelisted);
+                    }
+                    String modList = String.join(", ", missingWhitelisted);
+                    return new PlayerModStatus(missingWhitelistModMessage.replace("{mod}", modList), "kick", missingWhitelisted, true, false);
+                }
+            }
+
+            Set<String> nonWhitelistedMods = new HashSet<>(normalizedClientMods);
+            nonWhitelistedMods.removeAll(whitelistedModsActive);
             if (!nonWhitelistedMods.isEmpty()) {
+                if (HandShakerPlugin.DEBUG) {
+                    plugin.getLogger().info("[DEBUG] Whitelist failed (extra mods): " + nonWhitelistedMods);
+                }
                 String modList = String.join(", ", nonWhitelistedMods);
                 ModConfig cfg = modConfigMap.get(nonWhitelistedMods.iterator().next().toLowerCase(Locale.ROOT));
                 String actionName = cfg != null ? cfg.getActionName() : "kick";
@@ -753,7 +788,8 @@ public class ConfigManager {
             .replaceAll("playerdb-enabled:\\s*(?:true|false)", "playerdb-enabled: " + playerdbEnabled)
             .replaceAll("mods-required-enabled:\\s*(?:true|false)", "mods-required-enabled: " + modsRequiredEnabled)
             .replaceAll("mods-blacklisted-enabled:\\s*(?:true|false)", "mods-blacklisted-enabled: " + modsBlacklistedEnabled)
-            .replaceAll("mods-whitelisted-enabled:\\s*(?:true|false)", "mods-whitelisted-enabled: " + modsWhitelistedEnabled);
+            .replaceAll("mods-whitelisted-enabled:\\s*(?:true|false)", "mods-whitelisted-enabled: " + modsWhitelistedEnabled)
+            .replaceAll("strict-whitelist-match:\\s*(?:true|false)", "strict-whitelist-match: " + strictWhitelistMatch);
         
         try (FileWriter writer = new FileWriter(configYmlFile)) {
             writer.write(yaml);
